@@ -75,7 +75,8 @@ const clone = (value: State | undefined) => {
 
 export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
   name: "Local",
-  init: () => {
+  // `sessionID` scopes the selection to a session other than the routed one (an extension's session composer).
+  init: (props: { sessionID?: string }) => {
     const params = useParams()
     const sdk = useWorkspaceLocation()
     const data = useData()
@@ -85,10 +86,12 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
     const settings = useSettings()
     const configuredModel = useConfiguredModel()
 
-    const id = createMemo(() => params.id || undefined)
+    const id = createMemo(() => props.sessionID ?? (params.id || undefined))
+    // A scoped session keeps its own agent selectable even when hidden, so submitting never swaps it away.
+    const pinned = createMemo(() => (props.sessionID ? data.session.get(props.sessionID)?.agent : undefined))
     const list = createMemo(() =>
       normalizeAgentList(data.location.agent.list({ directory: sdk().directory }) ?? []).filter(
-        (item) => item.mode !== "subagent" && !item.hidden,
+        (item) => (item.mode !== "subagent" && !item.hidden) || item.name === pinned(),
       ),
     )
     const agentsVisible = createMemo(() => settings.visibility.customAgents() || hasCustomAgent(list()))

@@ -3,9 +3,6 @@ export default {
   "command.description": "Open the side chat that sees this session's context",
   "tab.title": "Brainstorm",
   tooltip: "Brainstorm",
-  placeholder: "Brainstorm with the main session in view…",
-  send: "Send",
-  stop: "Stop",
   compact: "Compact brainstorm",
   clear: "Clear brainstorm",
   "clear.confirm": "Start a fresh brainstorm? This one's messages are deleted.",
@@ -18,7 +15,4 @@ export default {
   "context.main": "Main session",
   "context.own": "Brainstorm",
   "context.estimated": "Measured after the first reply",
-  "model.default": "Default effort",
-  "model.placeholder": "Model",
-  "agent.placeholder": "Agent",
 }

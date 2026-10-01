@@ -30,7 +30,12 @@ export type ComposerModel = ComposerEditorModel & {
   readonly model: ComposerControls["model"]
 }
 
-export function createComposerModel(adapter: ComposerAdapter, options?: { queue?: ComposerQueue }): ComposerModel {
+export function createComposerModel(
+  adapter: ComposerAdapter,
+  // `builtins: false` drops the app's client slash commands, which act on the routed session, for a composer bound
+  // to another session; server commands still submit to the composer's own session.
+  options?: { queue?: ComposerQueue; builtins?: boolean },
+): ComposerModel {
   const sdk = useWorkspaceLocation()
   const data = useData()
   const server = useServer()
@@ -201,7 +206,9 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
       type: "custom" as const,
     })),
     ...command.options
-      .filter((item) => !item.disabled && !item.id.startsWith("suggested.") && item.slash)
+      .filter(
+        (item) => options?.builtins !== false && !item.disabled && !item.id.startsWith("suggested.") && item.slash,
+      )
       .map((item) => ({
         id: item.id,
         trigger: item.slash!,

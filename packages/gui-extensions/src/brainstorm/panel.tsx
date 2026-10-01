@@ -6,8 +6,6 @@ import { Icon } from "@opencode/ui/icon"
 import { IconButton } from "@opencode/ui/icon-button"
 import { ProgressCircle } from "@opencode/ui/progress-circle"
 import { ScrollView } from "@opencode/ui/scroll-view"
-import { Select } from "@opencode/ui/select"
-import { Textarea } from "@opencode/ui/textarea"
 import { Tooltip } from "@opencode/ui/tooltip"
 import { showToast } from "@opencode/ui/toast"
 import { useI18n } from "@opencode/ui/context/i18n"
@@ -19,7 +17,7 @@ import { contextShare } from "./usage"
 export default function BrainstormPanel(props: { threads: Threads; session: SessionView }) {
   const ctx = useExtension()
   const i18n = useI18n()
-  const [state, setState] = createStore({ draft: "", failed: false })
+  const [state, setState] = createStore({ failed: false })
   const data = () => props.session.server.data
   const client = () => props.session.server.client
   const location = () => ({ directory: props.session.directory })
@@ -63,12 +61,6 @@ export default function BrainstormPanel(props: { threads: Threads; session: Sess
     const current = info()?.model
     return models().find((item) => item.providerID === current?.providerID && item.id === current?.id)
   })
-  const variants = createMemo(() => ["default", ...(model()?.variants.map((variant) => variant.id) ?? [])])
-  const agents = createMemo(() =>
-    (data().location.agent.list(location()) ?? []).filter(
-      (agent) => agent.id === info()?.agent || (!agent.hidden && agent.mode !== "subagent"),
-    ),
-  )
   const share = createMemo(() =>
     contextShare({
       thread: messages(),
@@ -81,35 +73,11 @@ export default function BrainstormPanel(props: { threads: Threads; session: Sess
   const act = (action: () => Promise<unknown> | undefined) => {
     void Promise.resolve(action()).catch(() => showToast({ title: ctx.t("action.failed") }))
   }
-  const send = () => {
-    const text = state.draft.trim()
-    const sessionID = thread()
-    if (!text || !sessionID || busy()) return
-    setState("draft", "")
-    void data()
-      .session.prompt({ sessionID, text })
-      .catch(() => {
-        setState("draft", text)
-        showToast({ title: ctx.t("send.failed") })
-      })
-  }
-  const stop = () => act(() => (thread() ? client().session.interrupt({ sessionID: thread()! }) : undefined))
   const compact = () => act(() => (thread() ? client().session.compact({ sessionID: thread()! }) : undefined))
   const clear = () => {
     if (!window.confirm(ctx.t("clear.confirm"))) return
     act(() => props.threads.clear(props.session))
   }
-  const switchModel = (next: { providerID: string; id: string } | null, variant?: string) => {
-    const sessionID = thread()
-    if (!next || !sessionID) return
-    act(() =>
-      client().session.switchModel({
-        sessionID,
-        model: { providerID: next.providerID, id: next.id, ...(variant && variant !== "default" ? { variant } : {}) },
-      }),
-    )
-  }
-
   return (
     <div class="flex h-full min-h-0 flex-col bg-v2-background-bg-base" data-slot="brainstorm-panel">
       <div class="flex shrink-0 items-center justify-between gap-3 border-b border-v2-border-border-base px-4 py-2">
@@ -194,64 +162,11 @@ export default function BrainstormPanel(props: { threads: Threads; session: Sess
         </Switch>
       </div>
 
-      <div class="shrink-0 border-t border-v2-border-border-base px-3 py-2" data-slot="brainstorm-composer">
-        <Textarea
-          rows={3}
-          value={state.draft}
-          placeholder={ctx.t("placeholder")}
-          disabled={!thread()}
-          onInput={(event) => setState("draft", event.currentTarget.value)}
-          onKeyDown={(event) => {
-            if (event.key !== "Enter" || event.shiftKey || event.isComposing) return
-            event.preventDefault()
-            send()
-          }}
-        />
-        <div class="mt-2 flex items-center gap-2">
-          <Select
-            options={models()}
-            current={model()}
-            value={(item) => `${item.providerID}/${item.id}`}
-            label={(item) => item.name}
-            groupBy={(item) => item.providerID}
-            placeholder={ctx.t("model.placeholder")}
-            placement="top-start"
-            onSelect={(item) => switchModel(item)}
-          />
-          <Show when={variants().length > 1}>
-            <Select
-              options={variants()}
-              current={info()?.model?.variant ?? "default"}
-              label={(item) => (item === "default" ? ctx.t("model.default") : item)}
-              placement="top-start"
-              onSelect={(item) => item && switchModel(model() ?? null, item)}
-            />
-          </Show>
-          <Select
-            options={agents()}
-            current={agents().find((agent) => agent.id === info()?.agent)}
-            value={(agent) => agent.id}
-            label={(agent) => agent.name ?? agent.id}
-            placeholder={ctx.t("agent.placeholder")}
-            placement="top-start"
-            onSelect={(agent) =>
-              agent && thread() && act(() => client().session.switchAgent({ sessionID: thread()!, agent: agent.id }))
-            }
-          />
-          <div class="flex-1" />
-          <Show
-            when={busy()}
-            fallback={
-              <Button size="small" disabled={!thread() || !state.draft.trim()} onClick={send}>
-                {ctx.t("send")}
-              </Button>
-            }
-          >
-            <Button size="small" variant="outline" onClick={stop}>
-              {ctx.t("stop")}
-            </Button>
-          </Show>
-        </div>
+      {/* The app's own composer, bound to the thread: model, effort, agent, attachments, mentions, and queue. */}
+      <div class="shrink-0 px-3 pb-3" data-slot="brainstorm-composer">
+        <Show when={thread()} keyed>
+          {(sessionID) => <props.session.SessionComposer sessionID={sessionID} />}
+        </Show>
       </div>
     </div>
   )
