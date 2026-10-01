@@ -90,6 +90,8 @@ stdenv.mkDerivation (finalAttrs: {
     export OPENCODE_CLI_DIST="$TMPDIR/desktop-cli"
     cli_package=$(bun -e 'import { getCurrentCli } from "./scripts/utils.ts"; console.log(getCurrentCli().package.replace("@opencode/", ""))')
     mkdir -p "$OPENCODE_CLI_DIST/$cli_package/bin"
+    # scripts/utils.ts copyCliToResources reads the CLI version from a package.json beside the binary.
+    echo '{"version":"${finalAttrs.version}"}' > "$OPENCODE_CLI_DIST/$cli_package/package.json"
     cp ${lib.getExe opencode} "$OPENCODE_CLI_DIST/$cli_package/bin/opencode"
 
     bun run build

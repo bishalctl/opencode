@@ -84,15 +84,14 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     runHook postInstall
   '';
 
+  # The `completion` subcommand is gone; completions come from the global --completions flag. Its scripts register
+  # the `opencode` command name only, so the opencode2 alias gets none. The CLI writes its state dirs under HOME.
   postInstall = lib.optionalString (stdenvNoCC.buildPlatform.canExecute stdenvNoCC.hostPlatform) ''
-    # trick yargs into also generating zsh completions
+    export HOME="$(mktemp -d)"
     installShellCompletion --cmd opencode \
-      --bash <($out/bin/opencode completion) \
-      --zsh <(SHELL=/bin/zsh $out/bin/opencode completion)
-
-    installShellCompletion --cmd opencode2 \
-      --bash <($out/bin/opencode2 completion) \
-      --zsh <(SHELL=/bin/zsh $out/bin/opencode2 completion)
+      --bash <($out/bin/opencode --completions bash) \
+      --zsh <($out/bin/opencode --completions zsh) \
+      --fish <($out/bin/opencode --completions fish)
   '';
 
   nativeInstallCheckInputs = [
