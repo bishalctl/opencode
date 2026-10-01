@@ -11,6 +11,8 @@ import pairing from "./pairing"
 import updater from "./updater"
 import ssh from "./ssh"
 import wsl from "./wsl"
+// Fork feature (bishal-patches/PATCHES.md).
+import brainstorm from "./brainstorm"
 
 /** Built-in extensions with their renderer entries. The only place host builds name extensions. */
 export const builtins: readonly Definition[] = [
@@ -26,4 +28,5 @@ export const builtins: readonly Definition[] = [
   { ...updater, renderer: () => import("./updater/renderer") },
   { ...ssh, renderer: () => import("./ssh/renderer") },
   { ...wsl, renderer: () => import("./wsl/renderer") },
+  { ...brainstorm, renderer: () => import("./brainstorm/renderer") },
 ]

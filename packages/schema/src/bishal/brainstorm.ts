@@ -22,8 +22,9 @@ export function mainOf(info: {
   return info.parentID !== undefined && main === info.parentID ? info.parentID : undefined
 }
 
-const Main = Schema.Struct({ sessionID: Session.ID })
-const Thread = Schema.Struct({ sessionID: Session.ID })
+// Standard Schema values keep the definition portable: the renderer's promise client accepts only those.
+const Main = Schema.toStandardSchemaV1(Schema.Struct({ sessionID: Session.ID }))
+const Thread = Schema.toStandardSchemaV1(Schema.Struct({ sessionID: Session.ID }))
 
 export const Definition = Rpc.define({
   id: "bishal.brainstorm",
