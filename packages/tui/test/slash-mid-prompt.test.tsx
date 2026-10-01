@@ -6,7 +6,7 @@ import { createAppFixture } from "./fixture/app"
 
 // Fork feature (bishal-patches/PATCHES.md): "/" opens the skill and command picker mid-sentence.
 
-async function setupSession() {
+async function setupSession(commands = [{ name: "review", description: "Review the input" }]) {
   const state = await tmpdir()
   const mutations: { type: string; body: unknown }[] = []
   const location = { directory, project: { id: "project", directory, canonical: directory } }
@@ -36,8 +36,7 @@ async function setupSession() {
             { id: "first", providerID: "demo", name: "first model", variants: [], cost: [], time: { released: 0 } },
           ],
         })
-      if (url.pathname === "/api/command")
-        return json({ location, data: [{ name: "review", description: "Review the input" }] })
+      if (url.pathname === "/api/command") return json({ location, data: commands })
       if (url.pathname === "/api/skill")
         return json({
           location,
@@ -137,4 +136,19 @@ test("a mid-sentence path with no matches hides the picker and submits as typed"
   expect(fixture.mutations.find((mutation) => mutation.type === "prompt")?.body).toMatchObject({
     text: "read /etc/hosts",
   })
+})
+
+test("a command and a skill with the same name are tagged in brackets", async () => {
+  await using fixture = await setupSession([{ name: "deploy-docs", description: "Wrapper that loads the skill" }])
+  const setup = fixture.setup
+
+  await setup.mockInput.typeText("please use /dep")
+  const picker = await setup.waitForFrame(
+    (frame) => frame.includes("/deploy-docs (skill)") && frame.includes("/deploy-docs (command)"),
+  )
+  expect(picker).not.toMatch(/\/deploy-docs\s+Publish/)
+
+  setup.mockInput.pressEscape()
+  await setup.mockInput.typeText(" ")
+  await setup.waitForFrame((frame) => !frame.includes("(command)"))
 })

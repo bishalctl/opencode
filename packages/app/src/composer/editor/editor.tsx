@@ -842,6 +842,7 @@ export function ComposerEditorPopover(props: {
                 <ComposerSuggestionIcon item={item} />
                 <bdi dir="auto" class="shrink-0 text-v2-text-text-base">
                   {item.label}
+                  {item.tag ? ` (${item.tag})` : ""}
                 </bdi>
                 <Show when={item.description}>
                   <span class="min-w-0 truncate text-v2-text-text-muted">{item.description}</span>

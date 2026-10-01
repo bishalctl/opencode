@@ -520,7 +520,7 @@ export function Autocomplete(props: {
 
     results.push(...slashSkillOptions())
     results.sort((a, b) => a.display.localeCompare(b.display))
-    return alignDisplays(results)
+    return alignDisplays(tagDuplicates(results))
   })
 
   // Mid-sentence "/" offers what can be referenced or hoisted: skills inline, server commands
@@ -535,7 +535,7 @@ export function Autocomplete(props: {
       })),
     ]
     results.sort((a, b) => a.display.localeCompare(b.display))
-    return alignDisplays(results)
+    return alignDisplays(tagDuplicates(results))
   })
 
   const supplementalDirectoryOptions = createMemo((): AutocompleteOption[] => {
@@ -987,6 +987,18 @@ export function Autocomplete(props: {
         </Index>
       </scrollbox>
     </box>
+  )
+}
+
+// A command can share its name with a skill (e.g. a wrapper command that loads the skill), so
+// same-named entries say which one they are. `value` keeps matching on the bare name.
+function tagDuplicates(options: AutocompleteOption[]) {
+  const counts = new Map<string, number>()
+  options.forEach((item) => counts.set(item.display, (counts.get(item.display) ?? 0) + 1))
+  return options.map((item) =>
+    (counts.get(item.display) ?? 0) > 1
+      ? { ...item, value: item.display, display: `${item.display} (${item.kind === "skill" ? "skill" : "command"})` }
+      : item,
   )
 }
 
