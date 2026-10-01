@@ -11,6 +11,8 @@ import pairing from "./pairing"
 import updater from "./updater"
 import ssh from "./ssh"
 import wsl from "./wsl"
+// Fork feature (bishal-patches/PATCHES.md).
+import brainstorm from "./brainstorm"
 
 /** Built-in extensions with their main entries. Lists every built-in so their ids stay reserved. */
 export const builtins: readonly Definition[] = [
@@ -26,4 +28,5 @@ export const builtins: readonly Definition[] = [
   { ...updater, main: () => import("./updater/main") },
   { ...ssh, main: () => import("./ssh/main") },
   { ...wsl, main: () => import("./wsl/main") },
+  brainstorm,
 ]

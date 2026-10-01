@@ -71,7 +71,8 @@ export const createTabComposerState = (
 export const { use: useComposerState, provider: ComposerPersistenceProvider } = createSimpleContext({
   name: "ComposerState",
   gate: false,
-  init: () => {
+  // `sessionID` scopes the draft to a session other than the routed one (an extension's session composer).
+  init: (props: { sessionID?: string }) => {
     const params = useParams<{ serverKey?: string; id?: string }>()
     const sdk = useWorkspaceLocation()
     const [search] = useSearchParams<{ draftId?: string }>()
@@ -100,7 +101,11 @@ export const { use: useComposerState, provider: ComposerPersistenceProvider } = 
     const serverKey = () =>
       params.serverKey ? requireServerKey(params.serverKey) : ServerConnection.key(serverSDK.server)
     const scope = (): PromptScope =>
-      search.draftId ? { draftID: search.draftId } : { dir: base64Encode(sdk().directory), id: params.id }
+      props.sessionID
+        ? { dir: base64Encode(sdk().directory), id: props.sessionID }
+        : search.draftId
+          ? { draftID: search.draftId }
+          : { dir: base64Encode(sdk().directory), id: params.id }
     const load = (scope: PromptScope, target?: { server?: ServerConnection.Key; scope: ServerScope }) => {
       const current = selectPromptTab(tabs.store, scope, target?.server ?? serverKey())
       if (current) return createTabComposerState(tabs, current, target?.scope ?? serverSDK.scope, scope)

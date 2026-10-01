@@ -5,7 +5,7 @@ Fork-owned code, scripts, and docs for `bishalctl/opencode`. Everything the fork
 ```
 bishal-patches/
   bin/        launchers: ocb (CLI/TUI/server), ocb-desktop, ocb-web, plus env.sh shared by all three
-  scripts/    fork maintenance (sync-upstream.sh)
+  scripts/    fork maintenance (sync-upstream.sh) and tools (app-e2e.sh: app Playwright specs on NixOS)
   packages/   fork-only workspace packages (bishal-patches/packages/* is in the root workspaces)
   PATCHES.md  ledger of every upstream file the fork modifies
 ```

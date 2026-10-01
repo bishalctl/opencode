@@ -17,6 +17,7 @@ import { useFile } from "@/workspaces/files/model"
 import { useWorkspaceLocation } from "@/workspaces/location"
 import { pathKey } from "@/workspaces/path-key"
 import { useExtensionAttachment } from "./services"
+import { ExtensionSessionComposer } from "./session-composer"
 
 const noTasks: readonly BackgroundTask[] = []
 
@@ -170,6 +171,7 @@ export function createSessionView(session: SessionModel) {
     file: files,
     comment,
     composer: composerRef,
+    SessionComposer: ExtensionSessionComposer,
   }
 
   createEffect(() => {

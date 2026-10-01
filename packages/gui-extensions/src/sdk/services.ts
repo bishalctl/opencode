@@ -201,6 +201,12 @@ export interface SessionView extends SessionRef {
   readonly file: Files
   readonly comment: Comments
   readonly composer: Composer
+  /**
+   * The app's composer bound to another session in this view's location, e.g. a child session the extension owns:
+   * its own draft, agent and model selection, and queue. Client slash commands are omitted (they act on the routed
+   * session); server commands submit to `sessionID`.
+   */
+  readonly SessionComposer: (props: { readonly sessionID: string }) => JSX.Element
 }
 
 export interface Sessions {
