@@ -4,6 +4,7 @@ import { BackgroundServiceState } from "./background-service-state"
 import { cleanStages, DesktopCli } from "./desktop-cli"
 import { SidecarCredentials } from "./sidecar-credentials"
 import { sidecarProbe } from "./sidecar-probe"
+import { inheritedDescriptorsEnv } from "./inherited-descriptors"
 
 export * as BackgroundService from "./background-service"
 
@@ -44,6 +45,7 @@ const connect = Effect.fn("BackgroundService.connect")(function* (mode: "initial
           ? path.join(app.getPath("userData"), "opencode", "service-local.json")
           : undefined,
       version,
+      env: inheritedDescriptorsEnv(),
       // A fixed port makes a second contender fail to bind and back off; port 0 never collides, so two
       // services could boot against the same database.
       command: [
