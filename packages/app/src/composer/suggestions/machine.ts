@@ -6,7 +6,8 @@ export type ComposerInteractionState = {
   popover:
     | { type: "closed" }
     | { type: "context"; query: string; activeID?: string }
-    | { type: "command-inline"; query: string; activeID?: string }
+    // `start` is the offset of a mid-sentence "/"; it is absent when the slash opens the prompt.
+    | { type: "command-inline"; query: string; activeID?: string; start?: number }
     | { type: "command-menu"; query: string; activeID?: string }
   drag: "idle" | "active"
   focus: "editor" | "command-search" | "external"
@@ -37,6 +38,7 @@ export type ComposerInteractionCommand =
   | { type: "draft.setText"; value: string }
   | { type: "draft.addText"; value: string }
   | { type: "mention.add"; item: ComposerSuggestion; range?: { start: number; end: number } }
+  | { type: "command.hoist"; label: string; range: { start: number; end: number } }
   | { type: "popover.filter"; popover: "command" | "context"; query: string }
   | { type: "suggestion.select"; id: string }
   | { type: "focus.editor" }
@@ -104,13 +106,16 @@ function inputChanged(
     ])
   }
 
-  const command = value.match(/^\/(\S*)$/)
+  // A persisted change rewrites the draft with the cursor at the end, so the stored cursor is stale.
+  const end = persist ? value.length : (cursor ?? value.length)
+  const command = value.slice(0, end).match(/(?:^|\s)\/(\S*)$/)
   if (command) {
     const query = command[1] ?? ""
-    return changed({ ...state, popover: { type: "command-inline", query }, focus: "editor" }, [
-      ...setText,
-      { type: "popover.filter", popover: "command", query },
-    ])
+    const start = end - query.length - 1
+    return changed(
+      { ...state, popover: { type: "command-inline", query, ...(start > 0 ? { start } : {}) }, focus: "editor" },
+      [...setText, { type: "popover.filter", popover: "command", query }],
+    )
   }
 
   return changed(
@@ -168,23 +173,24 @@ function suggestionSelected(
 ): ComposerEditorTransition {
   const current = promptText(persisted)
   const commands: ComposerInteractionCommand[] = []
-  if (item.kind === "command") {
+  const token =
+    state.popover.type === "command-inline"
+      ? { start: state.popover.start ?? 0, end: (state.popover.start ?? 0) + state.popover.query.length + 1 }
+      : undefined
+  // Commands only run from the start of the prompt, so the typed "/query" token is replaced by the
+  // command at the front and the rest of the prompt (mentions included) becomes its arguments.
+  if (item.kind === "command" && token) {
+    commands.push({ type: "command.hoist", label: item.label, range: token })
+  } else if (item.kind === "command") {
     commands.push({
       type: "draft.setText",
-      value:
-        state.popover.type === "command-menu"
-          ? current.trim()
-            ? `${item.label} ${current.trim()}`
-            : `${item.label} `
-          : replaceTrigger(current, "/", `${item.label} `),
+      value: current.trim() ? `${item.label} ${current.trim()}` : `${item.label} `,
     })
   } else {
     commands.push({
       type: "mention.add",
       item,
-      ...(item.kind === "skill" && item.label.startsWith("/")
-        ? { range: { start: 0, end: state.popover.type === "command-menu" ? 0 : current.length } }
-        : {}),
+      ...(item.kind === "skill" && item.label.startsWith("/") ? { range: token ?? { start: 0, end: 0 } } : {}),
     })
   }
   commands.push({ type: "focus.editor" })
@@ -195,6 +201,10 @@ function keyDown(
   state: ComposerInteractionState,
   event: Extract<ComposerInteractionEvent, { type: "key.down" }>,
 ): ComposerEditorTransition {
+  // A mid-sentence "/" is often just a path; with nothing to pick, keys keep their normal meaning.
+  if (state.popover.type === "command-inline" && state.popover.start !== undefined && event.ids.length === 0) {
+    return unchanged(state)
+  }
   if (event.ctrl && event.key.toLowerCase() === "g") {
     if (state.popover.type === "closed") return unchanged(state)
     return changed({ ...state, popover: { type: "closed" }, focus: "editor" }, [{ type: "focus.editor" }], true)
@@ -239,11 +249,6 @@ function populated(persisted: ComposerPersistedState) {
     persisted.context.items.length > 0 ||
     persisted.prompt.some((part) => part.type === "file" || isAttachment(part))
   )
-}
-
-function replaceTrigger(value: string, trigger: "@" | "/", replacement: string) {
-  const index = trigger === "/" ? value.indexOf(trigger) : value.lastIndexOf(trigger)
-  return index < 0 ? replacement : value.slice(0, index) + replacement
 }
 
 function changed(

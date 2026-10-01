@@ -11,4 +11,17 @@ export OPENCODE_DB=opencode.db
 # Don't steal the opencode:// handler from the upstream desktop.
 export OPENCODE_DESKTOP_DISABLE_PROTOCOL_REGISTRATION=1
 
+# NixOS can't run npm's prebuilt Electron. electron-vite honors ELECTRON_EXEC_PATH, so use a
+# Nix-built Electron with the same major version as the desktop's pin (native modules are built
+# against that ABI). The nixpkgs pinned for /etc/nixos's opencode-v2-desktop provides one.
+if [ -e /etc/NIXOS ] && [ -z "${ELECTRON_EXEC_PATH:-}" ]; then
+  major="$(sed -n 's/.*"electron": "\([0-9]*\)\..*/\1/p' "$OCB_REPO/packages/desktop/package.json")"
+  ELECTRON_EXEC_PATH="$(ls -d /nix/store/*-electron-"$major".*/bin/electron 2>/dev/null | sort -V | tail -1)"
+  if [ -z "$ELECTRON_EXEC_PATH" ]; then
+    echo "ocb-desktop: no Nix-built Electron $major.x in /nix/store; build one or set ELECTRON_EXEC_PATH" >&2
+    exit 1
+  fi
+  export ELECTRON_EXEC_PATH
+fi
+
 exec bun run --cwd "$OCB_REPO/packages/desktop" dev "$@"

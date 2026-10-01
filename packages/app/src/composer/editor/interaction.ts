@@ -134,7 +134,10 @@ export function createComposerEditor(input: {
     },
   })
   const commandList = useFilteredList<ComposerSuggestion>({
-    items: () => input.commands(),
+    items: () =>
+      state.popover.type === "command-inline" && state.popover.start !== undefined
+        ? input.commands().filter((item) => item.inline)
+        : input.commands(),
     key: (item) => item.id,
     filterKeys: ["trigger", "title"],
   })
@@ -152,6 +155,10 @@ export function createComposerEditor(input: {
     }
     if (command.type === "mention.add") {
       if (command.item.mention) draft.addMention(command.item.mention, command.range)
+      return
+    }
+    if (command.type === "command.hoist") {
+      draft.moveToFront(`${command.label} `, command.range)
       return
     }
     if (command.type === "popover.filter") {
@@ -305,6 +312,11 @@ export function createComposerEditor(input: {
     state,
     view: input.view,
     suggestions,
+    popoverOpen() {
+      if (state.popover.type === "closed") return false
+      // Matches the key handling in the machine: an empty mid-sentence "/" picker stays out of the way.
+      return !(state.popover.type === "command-inline" && state.popover.start !== undefined && !suggestions().length)
+    },
     dispatch,
     onKeyDown,
     value() {

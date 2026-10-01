@@ -94,7 +94,7 @@ export function Autocomplete(props: {
   const [confirming, setConfirming] = createSignal<string>()
 
   createEffect(() => {
-    if (!store.visible) return
+    if (!shown()) return
     const popMode = keymap.mode.push("autocomplete")
     onCleanup(popMode)
   })
@@ -156,6 +156,7 @@ export function Autocomplete(props: {
       | { type: "file"; value: NonNullable<PromptInfo["files"]>[number]; path?: string }
       | { type: "agent"; value: NonNullable<PromptInfo["agents"]>[number] }
       | { type: "skill"; value: NonNullable<PromptInfo["skills"]>[number] },
+    prefix: "@" | "/" = "@",
   ) {
     if (part.type === "skill" && props.hasSkill(part.value.id)) return
     const input = props.input()
@@ -163,7 +164,6 @@ export function Autocomplete(props: {
 
     const charAfterCursor = displayCharAt(props.value, currentCursorOffset)
     const needsSpace = charAfterCursor !== " "
-    const prefix = "@"
     const append = prefix + text + (needsSpace ? " " : "")
 
     input.cursorOffset = store.index
@@ -424,21 +424,28 @@ export function Autocomplete(props: {
       )
   })
 
-  const skillOptions = createMemo(() =>
-    (data.location.skill.list(location.current) ?? []).map(
+  // Skills picked from the "/" list keep the slash they were typed with.
+  function skillOptionsWith(prefix: "@" | "/") {
+    return (data.location.skill.list(location.current) ?? []).map(
       (skill): AutocompleteOption => ({
-        display: "@" + skill.id,
+        display: prefix + skill.id,
         description: skill.description,
         kind: "skill",
         onSelect: () => {
-          insertPart(skill.id, {
-            type: "skill",
-            value: { id: Skill.ID.make(skill.id), mention: { start: 0, end: 0, text: "" } },
-          })
+          insertPart(
+            skill.id,
+            {
+              type: "skill",
+              value: { id: Skill.ID.make(skill.id), mention: { start: 0, end: 0, text: "" } },
+            },
+            prefix,
+          )
         },
       }),
-    ),
-  )
+    )
+  }
+  const skillOptions = createMemo(() => skillOptionsWith("@"))
+  const slashSkillOptions = createMemo(() => skillOptionsWith("/"))
 
   const referenceAliases = createMemo(() =>
     references()
@@ -471,6 +478,24 @@ export function Autocomplete(props: {
     props.input().cursorOffset = stringWidth(newText)
   }
 
+  // Server commands only run from the start of the prompt, so one picked mid-sentence moves to
+  // the front and the rest of the prompt becomes its arguments.
+  function hoistSlash(name: string) {
+    const input = props.input()
+    const cursorOffset = input.cursorOffset
+    // Also drop the space that separated the token from the sentence.
+    const from = /[ \t]/.test(displayCharAt(input.plainText, store.index - 1) ?? "") ? store.index - 1 : store.index
+    input.cursorOffset = from
+    const start = input.logicalCursor
+    input.cursorOffset = cursorOffset
+    const end = input.logicalCursor
+    input.deleteRange(start.row, start.col, end.row, end.col)
+    const head = `/${name} `
+    input.cursorOffset = 0
+    input.insertText(head)
+    input.cursorOffset = from + stringWidth(head)
+  }
+
   const commands = createMemo((): AutocompleteOption[] => {
     const results: AutocompleteOption[] = keymapCommands().flatMap((command) => {
       const slash = command.slash
@@ -493,14 +518,24 @@ export function Autocomplete(props: {
       })
     }
 
+    results.push(...slashSkillOptions())
     results.sort((a, b) => a.display.localeCompare(b.display))
+    return alignDisplays(tagDuplicates(results))
+  })
 
-    const max = firstBy(results, [(x) => x.display.length, "desc"])?.display.length
-    if (!max) return results
-    return results.map((item) => ({
-      ...item,
-      display: item.display.padEnd(max + 2),
-    }))
+  // Mid-sentence "/" offers what can be referenced or hoisted: skills inline, server commands
+  // (config commands and MCP prompts) moved to the front. Client-only commands stay start-only.
+  const inlineCommands = createMemo((): AutocompleteOption[] => {
+    const results: AutocompleteOption[] = [
+      ...slashSkillOptions(),
+      ...(data.location.command.list(location.current) ?? []).map((serverCommand) => ({
+        display: "/" + serverCommand.name,
+        description: serverCommand.description,
+        onSelect: () => hoistSlash(serverCommand.name),
+      })),
+    ]
+    results.sort((a, b) => a.display.localeCompare(b.display))
+    return alignDisplays(tagDuplicates(results))
   })
 
   const supplementalDirectoryOptions = createMemo((): AutocompleteOption[] => {
@@ -522,7 +557,7 @@ export function Autocomplete(props: {
     const referenceMatchValue = referenceMatch()
     const agentsValue = agents()
     const referenceAliasesValue = referenceAliases()
-    const commandsValue = commands()
+    const commandsValue = store.index === 0 ? commands() : inlineCommands()
     const searchValue = search()
 
     if (store.visible === "directory") {
@@ -539,11 +574,7 @@ export function Autocomplete(props: {
     // it shouldn't be additionally sorted by fuzzysort as it will loose the results
     const fileOptions: AutocompleteOption[] = store.visible === "reference" ? fileSearch.options : []
     const nonFileOptions: AutocompleteOption[] =
-      store.visible === "reference"
-        ? [...skillOptions(), ...referenceAliasesValue, ...agentsValue]
-        : store.index === 0
-          ? [...commandsValue]
-          : []
+      store.visible === "reference" ? [...skillOptions(), ...referenceAliasesValue, ...agentsValue] : [...commandsValue]
 
     if (!searchValue) {
       return [...nonFileOptions, ...fileOptions]
@@ -574,6 +605,13 @@ export function Autocomplete(props: {
 
     return [...fuzziedNonFiles, ...fileOptions].slice(0, 10)
   })
+
+  // A mid-sentence "/" is often just a path, so that picker only shows while something matches;
+  // otherwise Enter and the other prompt keys keep their normal meaning.
+  function shown() {
+    if (store.visible === "command" && store.index > 0 && options().length === 0) return false
+    return store.visible
+  }
 
   createEffect(() => {
     filter()
@@ -667,7 +705,7 @@ export function Autocomplete(props: {
   Keymap.createLayer(() => ({
     mode: "autocomplete",
     target: props.input,
-    enabled: () => Boolean(store.visible),
+    enabled: () => Boolean(shown()),
     bindings: ["prompt.queue"],
     commands: [
       {
@@ -770,7 +808,7 @@ export function Autocomplete(props: {
 
     props.ref({
       get visible() {
-        return store.visible
+        return shown()
       },
       completeQueueableCommand() {
         if (store.visible !== "command" || !options()[store.selected]?.queueable) return false
@@ -831,7 +869,7 @@ export function Autocomplete(props: {
   const scrollAcceleration = createMemo(() => getScrollAcceleration(config))
   const emptyMessage = createMemo(() => {
     const fileSearch = visibleFiles()
-    if (store.visible === "command") return "No matching commands"
+    if (store.visible === "command") return "No matching commands or skills"
     if (store.visible === "directory") {
       if (files.loading) return "Searching…"
       if (fileSearch.failed) return "Could not search directories. Keep typing to try again."
@@ -850,7 +888,7 @@ export function Autocomplete(props: {
 
   return (
     <box
-      visible={store.visible !== false}
+      visible={shown() !== false}
       position="absolute"
       top={position().y - height()}
       left={position().x}
@@ -950,4 +988,22 @@ export function Autocomplete(props: {
       </scrollbox>
     </box>
   )
+}
+
+// A command can share its name with a skill (e.g. a wrapper command that loads the skill), so
+// same-named entries say which one they are. `value` keeps matching on the bare name.
+function tagDuplicates(options: AutocompleteOption[]) {
+  const counts = new Map<string, number>()
+  options.forEach((item) => counts.set(item.display, (counts.get(item.display) ?? 0) + 1))
+  return options.map((item) =>
+    (counts.get(item.display) ?? 0) > 1
+      ? { ...item, value: item.display, display: `${item.display} (${item.kind === "skill" ? "skill" : "command"})` }
+      : item,
+  )
+}
+
+function alignDisplays(options: AutocompleteOption[]) {
+  const max = firstBy(options, [(x) => x.display.length, "desc"])?.display.length
+  if (!max) return options
+  return options.map((item) => ({ ...item, display: item.display.padEnd(max + 2) }))
 }

@@ -211,17 +211,42 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
         type: "builtin" as const,
       })),
   ])
-  const commands = createMemo<ComposerSuggestion[]>(() => [
-    ...slashCommands().map((item) => ({
-      id: item.id,
-      kind: "command" as const,
-      label: `/${item.trigger}`,
-      trigger: item.trigger,
-      title: item.title,
-      description: item.description,
-      keybind: command.keybindParts(item.id),
-    })),
-  ])
+  const commands = createMemo<ComposerSuggestion[]>(() => {
+    // A command can share its name with a skill (e.g. a wrapper command that loads the skill).
+    const skillIDs = new Set(skills().map((skill) => skill.id))
+    const commandTriggers = new Set(slashCommands().map((item) => item.trigger))
+    return [
+      ...slashCommands().map((item) => ({
+        id: item.id,
+        kind: "command" as const,
+        label: `/${item.trigger}`,
+        trigger: item.trigger,
+        title: item.title,
+        description: item.description,
+        keybind: command.keybindParts(item.id),
+        inline: item.type === "custom",
+        ...(skillIDs.has(item.trigger) ? { tag: "command" } : {}),
+      })),
+      ...skills().map((skill) => ({
+        id: `slash-skill:${skill.id}`,
+        kind: "skill" as const,
+        label: `/${skill.id}`,
+        trigger: skill.id,
+        title: skill.name,
+        description: skill.description,
+        inline: true,
+        ...(commandTriggers.has(skill.id) ? { tag: "skill" } : {}),
+        mention: {
+          type: "skill" as const,
+          id: Skill.ID.make(skill.id),
+          name: Skill.Name.make(skill.name),
+          content: `/${skill.id}`,
+          start: 0,
+          end: 0,
+        },
+      })),
+    ]
+  })
   const variants = createMemo(() => ["default", ...adapter.controls().model.selection.variant.list()])
   const submission = createComposerSubmit({
     adapter,

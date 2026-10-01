@@ -86,7 +86,36 @@ export function createComposerEditorActions(input: ComposerStateStoreInput) {
       setStore()("prompt", (parts) => parts.filter((part) => !isAttachment(part) || part.id !== id))
       clearRetry()
     },
+    // Replaces a mid-sentence token with `head` at the start of the prompt, keeping every other part.
+    moveToFront(head: string, range: { start: number; end: number }) {
+      const text = store()
+        .prompt.map((part) => ("content" in part ? part.content : ""))
+        .join("")
+      // Also drop the space that separated the token from the sentence.
+      const start = /[ \t]/.test(text[range.start - 1] ?? "") ? range.start - 1 : range.start
+      batch(() =>
+        setStore()((state) => ({
+          prompt: insertText(removeRange(state.prompt, start, range.end), 0, head),
+          cursor: start + head.length,
+          retry: undefined,
+        })),
+      )
+    },
   }
+}
+
+function removeRange(prompt: ComposerPrompt, start: number, end: number): ComposerPrompt {
+  let position = 0
+  const parts = prompt.flatMap<ComposerPrompt[number]>((part) => {
+    if (isAttachment(part)) return [part]
+    const partStart = position
+    position += part.content.length
+    if (part.type !== "text" || end <= partStart || start >= position) return [part]
+    const content =
+      part.content.slice(0, Math.max(0, start - partStart)) + part.content.slice(Math.max(0, end - partStart))
+    return content ? [{ ...part, content }] : []
+  })
+  return withOffsets(parts)
 }
 
 function insertText(prompt: ComposerPrompt, cursor: number, content: string): ComposerPrompt {
