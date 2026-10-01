@@ -12,8 +12,14 @@ const O_CLOEXEC = 0o2000000
 export const INHERITED_DESCRIPTORS_ENV = "OPENCODE_INHERITED_FDS"
 
 export function inheritedDescriptorsEnv(): Record<string, string> {
-  if (process.platform !== "linux") return {}
-  const descriptors = readdirSync("/proc/self/fd")
+  const descriptors = inheritedDescriptors().map((item) => `${item.fd}:${item.dev}:${item.ino}`)
+  return descriptors.length ? { [INHERITED_DESCRIPTORS_ENV]: descriptors.join(",") } : {}
+}
+
+/** This process's descriptors above stderr that the next spawned child inherits (Linux only). */
+export function inheritedDescriptors() {
+  if (process.platform !== "linux") return []
+  return readdirSync("/proc/self/fd")
     .map(Number)
     .filter((fd) => fd > 2)
     .flatMap((fd) => {
@@ -22,10 +28,9 @@ export function inheritedDescriptorsEnv(): Record<string, string> {
         const flags = readFileSync(`/proc/self/fdinfo/${fd}`, "utf8").match(/^flags:\s*([0-7]+)/m)?.[1]
         if (flags === undefined || Number.parseInt(flags, 8) & O_CLOEXEC) return []
         const stat = fstatSync(fd)
-        return [`${fd}:${stat.dev}:${stat.ino}`]
+        return [{ fd, dev: stat.dev, ino: stat.ino }]
       } catch {
         return []
       }
     })
-  return descriptors.length ? { [INHERITED_DESCRIPTORS_ENV]: descriptors.join(",") } : {}
 }
