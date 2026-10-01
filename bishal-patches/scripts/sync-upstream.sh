@@ -29,7 +29,7 @@ if [ "$behind" = 0 ]; then
 fi
 echo "upstream/v2 has $behind new commit(s) not in main/bishal."
 
-branch="sync-v2-$(date +%Y-%m-%d)"
+branch="chore/sync-v2-$(date +%Y%m%d)"
 dir="$root/$branch"
 if [ ! -d "$dir" ]; then
   git -C "$root" worktree add -b "$branch" "$dir" "$base"

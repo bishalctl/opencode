@@ -30,22 +30,24 @@ bishal-patches/
 
 ## Feature workflow
 
+Branches and worktrees are named `<type>/<short-name>`. The type is one of `feat`, `enhance`, `bug`, `hotfix`, `chore`, `refactor`, or `spike`. The short name is lowercase kebab-case, at most 4 words. See the fork block in `AGENTS.md`. Every branch, `hotfix/` included, starts from `main/bishal` and merges back through a PR.
+
 ```sh
-cd ~/personal/opencode/main/bishal
-git pull
-git worktree add -b my-feature ../../my-feature main/bishal
-cd ../../my-feature && bun install
+cd ~/personal/opencode
+git -C main/bishal pull
+git worktree add -b feat/user-auth feat/user-auth main/bishal
+cd feat/user-auth && bun install
 # ...work, commit...
-git push -u origin my-feature
+git push -u origin feat/user-auth
 gh pr create --repo bishalctl/opencode --base main/bishal
 ```
 
-When the PR is merged, run `git worktree remove ~/personal/opencode/my-feature && git branch -d my-feature`.
+Once the PR is merged, run this from `~/personal/opencode`: `git worktree remove feat/user-auth && git branch -D feat/user-auth`. Use `-D` because squash merges leave the branch unmerged from git's point of view.
 
 ## Syncing upstream v2
 
 ```sh
-bishal-patches/scripts/sync-upstream.sh        # fetch, mirror origin/v2, merge into a sync-v2-<date> worktree
+bishal-patches/scripts/sync-upstream.sh        # fetch, mirror origin/v2, merge into a chore/sync-v2-<yyyymmdd> worktree
 bishal-patches/scripts/sync-upstream.sh --pr   # same, then push and open the PR to main/bishal
 ```
 
