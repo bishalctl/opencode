@@ -1,12 +1,14 @@
 import { execFile } from "node:child_process"
 import util from "node:util"
 import { Effect, FileSystem, Path } from "effect"
+import { findExecutable, hostEnvironment } from "./launch"
 
 const execFilePromise = util.promisify(execFile)
 
 export const checkAppExists = Effect.fn("DesktopFiles.checkAppExists")(function* (appName: string) {
   if (process.platform === "win32") return true
-  if (process.platform === "linux") return true
+  // Fork fix (bishal-patches/PATCHES.md): list only apps on PATH, under any of their Linux names.
+  if (process.platform === "linux") return findExecutable(appName, hostEnvironment()) !== undefined
   return yield* checkMacosApp(appName)
 })
 
@@ -108,7 +110,11 @@ const resolveWindowsAppPath = Effect.fn("DesktopFiles.resolveWindowsAppPath")(fu
 
   if (key) {
     for (const file of paths) {
-      const dirs = [path.dirname(file), path.dirname(path.dirname(file)), path.dirname(path.dirname(path.dirname(file)))]
+      const dirs = [
+        path.dirname(file),
+        path.dirname(path.dirname(file)),
+        path.dirname(path.dirname(path.dirname(file))),
+      ]
       for (const dir of dirs) {
         const entries = yield* fs.readDirectory(dir).pipe(Effect.orElseSucceed(() => []))
         for (const entry of entries) {

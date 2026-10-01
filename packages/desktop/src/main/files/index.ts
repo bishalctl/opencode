@@ -8,6 +8,7 @@ import { scoped } from "../native/logging"
 import { nativeT } from "../native/translations"
 import { assertAttachmentBudget, createPickedFileAuthorizations, readAttachment } from "./attachment-picker"
 import { resolveExternalURL, resolveLocalFilePath } from "./external-url"
+import { findExecutable, hostEnvironment, launchDetached } from "./launch"
 
 export type Interface = ReturnType<typeof make>
 
@@ -75,15 +76,18 @@ function make(fs: FileSystem.FileSystem, path: Path.Path) {
       return true
     }),
     openPath: Effect.fn("DesktopFiles.openPath")(function* (target: string, application?: string) {
+      // Fork fix (bishal-patches/PATCHES.md): on Linux both paths launch detached with the user's environment.
+      if (process.platform === "linux") return yield* Effect.tryPromise(() => openOnLinux(target, application))
       if (!application) return yield* Effect.promise(() => shell.openPath(target))
-      yield* Effect.tryPromise(() =>
-        new Promise<void>((resolve, reject) => {
-          const command =
-            process.platform === "darwin"
-              ? { file: "open", arguments: ["-a", application, target] }
-              : { file: application, arguments: [target] }
-          execFile(command.file, command.arguments, (error) => (error ? reject(error) : resolve()))
-        }),
+      yield* Effect.tryPromise(
+        () =>
+          new Promise<void>((resolve, reject) => {
+            const command =
+              process.platform === "darwin"
+                ? { file: "open", arguments: ["-a", application, target] }
+                : { file: application, arguments: [target] }
+            execFile(command.file, command.arguments, (error) => (error ? reject(error) : resolve()))
+          }),
       )
     }),
     revealPath: Effect.fn("DesktopFiles.revealPath")(function* (target: string) {
@@ -112,6 +116,17 @@ function make(fs: FileSystem.FileSystem, path: Path.Path) {
       yield* Effect.promise(() => clipboard.writeText(text))
     }),
   }
+}
+
+// The default app comes from xdg-open, which reads the user's mimeapps (Electron's shell.openPath
+// resolves it from this process's isolated XDG dirs instead). Without xdg-open, Electron opens it.
+async function openOnLinux(target: string, application?: string) {
+  const env = hostEnvironment()
+  const file = findExecutable(application ?? "xdg-open", env)
+  if (file) return launchDetached(file, [target], env)
+  if (application) throw new Error(`${application} is not installed`)
+  const error = await shell.openPath(target)
+  return error || undefined
 }
 
 // Chromium exposes copied bitmaps as image/png; JPEG only appears when an app placed one explicitly.
