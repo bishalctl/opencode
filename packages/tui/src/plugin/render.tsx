@@ -70,8 +70,16 @@ export function PluginRoute(props: { readonly fallback: (id: string, name: strin
   )
 }
 
-// The nearest enclosing slot's path. Root slots mount outside any provider.
+// The nearest enclosing slot's path. Root slots mount outside any provider, or under SlotRoot ("").
 const SlotParent = createContext<string>()
+
+/**
+ * Starts a fresh slot tree inside another slot's boundary, for host content that carries its own root slots,
+ * e.g. a second session composer in a plugin's session panel (fork: bishal-patches/PATCHES.md).
+ */
+export function SlotRoot(props: ParentProps) {
+  return <SlotParent.Provider value="">{props.children}</SlotParent.Provider>
+}
 
 // `input` is required exactly when the path publishes a non-empty input.
 type SlotProps<Path extends SlotPath> = ParentProps<{ readonly path: Path }> &
@@ -92,7 +100,7 @@ export function Slot<Path extends SlotPath>(props: SlotProps<Path>) {
   // silently publish a mislocated public path, so containment fails loudly
   // at mount. Only host code can trip this — plugins cannot mount slots.
   const parent = useContext(SlotParent)
-  if (parent !== undefined && !contains(parent, path)) {
+  if (parent && !contains(parent, path)) {
     throw new Error(`Slot "${path}" is mounted inside "${parent}" but its path does not extend it`)
   }
   onCleanup(plugins.slots.register(path))

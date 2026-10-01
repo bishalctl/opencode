@@ -28,7 +28,8 @@ import { parse } from "../util/model"
 
 export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
   name: "Local",
-  init: () => {
+  // `sessionID` scopes agent and model selection to a session other than the routed one (a plugin's side composer).
+  init: (props: { sessionID?: string }) => {
     const data = useData()
     const toast = useToast()
     const theme = useTheme()
@@ -38,6 +39,9 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
     const event = useEvent()
     const permission = usePermission()
     const location = useLocation()
+    const scopedSession = () => props.sessionID ?? (route.data.type === "session" ? route.data.sessionID : undefined)
+    // A scoped session keeps its own agent selectable even when hidden, so submitting never swaps it away.
+    const pinnedAgent = () => (props.sessionID ? data.session.get(props.sessionID)?.agent : undefined)
 
     const models = () => data.location.model.list(location.ref)
     const providers = () => data.location.provider.list(location.ref)
@@ -55,7 +59,9 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
 
     function createAgent() {
       const agents = createMemo(() =>
-        (data.location.agent.list(location.ref) ?? []).filter((agent) => agent.mode !== "subagent" && !agent.hidden),
+        (data.location.agent.list(location.ref) ?? []).filter(
+          (agent) => (agent.mode !== "subagent" && !agent.hidden) || agent.id === pinnedAgent(),
+        ),
       )
       const visibleAgents = createMemo(() =>
         (data.location.agent.list(location.ref) ?? []).filter((agent) => !agent.hidden),
@@ -84,14 +90,14 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           return agents()
         },
         current() {
-          const draft = route.data.type === "session" ? agentStore.draftBySession[route.data.sessionID] : undefined
-          const selected =
-            route.data.type === "session"
-              ? (draft?.agent ??
-                (draft ? undefined : args.agent) ??
-                data.session.get(route.data.sessionID)?.agent ??
-                agentStore.current)
-              : agentStore.current
+          const session = scopedSession()
+          const draft = session ? agentStore.draftBySession[session] : undefined
+          const selected = session
+            ? (draft?.agent ??
+              (draft || props.sessionID ? undefined : args.agent) ??
+              data.session.get(session)?.agent ??
+              agentStore.current)
+            : agentStore.current
           return agents().find((agent) => agent.id === selected) ?? agents().at(0)
         },
         set(id: string) {
@@ -105,9 +111,10 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
             const changed = this.current()?.id !== id
             if (changed) model.remember()
             setAgentStore("current", id)
-            if (route.data.type === "session") setAgentStore("draftBySession", route.data.sessionID, { agent: id })
+            const session = scopedSession()
+            if (session) setAgentStore("draftBySession", session, { agent: id })
             // Retain both selections while agent and model commits arrive separately.
-            const selected = changed && route.data.type === "session" ? model.current() : undefined
+            const selected = changed && session ? model.current() : undefined
             if (selected) model.set(selected)
           })
         },
@@ -216,7 +223,8 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
       })
 
       const currentSelection = createMemo<ModelSelection | undefined>(() => {
-        if (route.data.type === "session") return sessionSelection(route.data.sessionID)
+        const session = scopedSession()
+        if (session) return sessionSelection(session)
         const model = newSessionModel()
         if (!model) return
         return preferredSelection(model)
@@ -303,8 +311,8 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
       }
 
       function selectModel(model: ModelPreferenceModel) {
-        if (route.data.type === "session") {
-          const sessionID = route.data.sessionID
+        const sessionID = scopedSession()
+        if (sessionID) {
           const current = sessionSelection(sessionID)
           setSessionDraft(
             sessionID,
@@ -327,12 +335,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
         if (selectionKey(durable) !== expected.selection) return
         pendingSelectionCommits.delete(sessionID)
         // Inactive agents keep their remembered choices after another agent commits.
-        if (
-          route.data.type !== "session" ||
-          route.data.sessionID !== sessionID ||
-          agent.current()?.id !== expected.agentID
-        )
-          return
+        if (scopedSession() !== sessionID || agent.current()?.id !== expected.agentID) return
         const draft = selectionState.selectionBySessionAgent[sessionID]?.[expected.agentID]
         if (draft && selectionKey(draft) === expected.selection)
           setSessionSelection(sessionID, expected.agentID, undefined)
@@ -354,8 +357,9 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
         remember() {
           const current = agent.current()
           const selection = currentSelection()
-          if (route.data.type !== "session" || !current || !selection) return
-          setSessionSelection(route.data.sessionID, current.id, { ...selection })
+          const session = scopedSession()
+          if (!session || !current || !selection) return
+          setSessionSelection(session, current.id, { ...selection })
         },
         available(model = currentModel()) {
           return model ? isModelValid(model) : false
@@ -485,9 +489,8 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           set(value: string | undefined) {
             const m = currentSelection()
             if (!m) return
-            if (route.data.type === "session") {
-              setSessionDraft(route.data.sessionID, { ...m, variant: normalizeModelVariant(value) })
-            }
+            const session = scopedSession()
+            if (session) setSessionDraft(session, { ...m, variant: normalizeModelVariant(value) })
             setPreferences("variant", modelPreferenceKey(m), value ?? "default")
             void repository.saveVariant(m, value).catch(() => undefined)
           },

@@ -73,6 +73,8 @@ import { PromptMetadataRow } from "./metadata"
 
 export type PromptProps = {
   sessionID?: string
+  /** False drops client slash commands, which act on the routed session, for a prompt bound to another session. */
+  builtins?: boolean
   visible?: boolean
   disabled?: boolean
   muted?: boolean
@@ -1123,7 +1125,7 @@ export function Prompt(props: PromptProps) {
     const trimmed = store.prompt.text.trim()
     if (!trimmed && (!props.sessionID || store.mode === "shell" || delivery === "queue"))
       return delivery === "steer" ? (await props.onEmptySubmit?.()) === true : false
-    const exitWord = trimmed === "exit" || trimmed === "quit" || trimmed === ":q"
+    const exitWord = props.builtins !== false && (trimmed === "exit" || trimmed === "quit" || trimmed === ":q")
     const inputText = expandTrackedPastedText(
       store.prompt.text,
       input.extmarks.getAllForTypeId(promptPartTypeId).flatMap((extmark) => {
@@ -1134,7 +1136,7 @@ export function Prompt(props: PromptProps) {
         return [{ start: extmark.start, end: extmark.end, text: part.text }]
       }),
     )
-    const slash = argumentSlash(inputText, keymapCommands())
+    const slash = props.builtins === false ? undefined : argumentSlash(inputText, keymapCommands())
     if (delivery === "queue" && (store.mode === "shell" || exitWord || slash)) {
       toast.show({ message: "This prompt cannot be queued", variant: "warning" })
       return false
@@ -1970,6 +1972,7 @@ export function Prompt(props: PromptProps) {
       </box>
       <Autocomplete
         sessionID={props.sessionID}
+        builtins={props.builtins}
         argumentAutocomplete={(command) => (command.id === "session.cd" ? "directory" : undefined)}
         directoryOptions={(query): AutocompleteOption[] => {
           if (query !== "") return []

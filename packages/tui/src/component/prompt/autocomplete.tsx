@@ -59,6 +59,8 @@ type AutocompleteResults = {
 export function Autocomplete(props: {
   value: string
   sessionID?: string
+  /** False leaves client slash commands out of the "/" list (see PromptProps.builtins). */
+  builtins?: boolean
   argumentAutocomplete?: (command: KeymapCommand) => "directory" | undefined
   directoryOptions?: (query: string) => AutocompleteOption[]
   setPrompt: (input: (prompt: PromptInfo) => void) => void
@@ -497,7 +499,7 @@ export function Autocomplete(props: {
   }
 
   const commands = createMemo((): AutocompleteOption[] => {
-    const results: AutocompleteOption[] = keymapCommands().flatMap((command) => {
+    const results: AutocompleteOption[] = (props.builtins === false ? [] : keymapCommands()).flatMap((command) => {
       const slash = command.slash
       if (!slash) return []
       return [slash.name, ...(slash.aliases ?? [])].map((name) => ({
@@ -819,7 +821,12 @@ export function Autocomplete(props: {
         if (dismissedValue() === value) return
         setDismissedValue(undefined)
         const offset = props.input().cursorOffset
-        const argument = slashArgumentAutocomplete(value, offset, keymapCommands(), props.argumentAutocomplete)
+        const argument = slashArgumentAutocomplete(
+          value,
+          offset,
+          props.builtins === false ? [] : keymapCommands(),
+          props.argumentAutocomplete,
+        )
         if (argument?.type === "directory") {
           show("directory", argument.index)
           return

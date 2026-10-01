@@ -12,7 +12,7 @@ import { useI18n } from "@opencode/ui/context/i18n"
 import { SessionTimeline } from "@opencode/session-ui/timeline"
 import { useExtension, type SessionView } from "../sdk"
 import type { Threads } from "./threads"
-import { contextShare } from "./usage"
+import { Brainstorm } from "@opencode/schema/bishal/brainstorm"
 
 export default function BrainstormPanel(props: { threads: Threads; session: SessionView }) {
   const ctx = useExtension()
@@ -62,7 +62,7 @@ export default function BrainstormPanel(props: { threads: Threads; session: Sess
     return models().find((item) => item.providerID === current?.providerID && item.id === current?.id)
   })
   const share = createMemo(() =>
-    contextShare({
+    Brainstorm.contextShare({
       thread: messages(),
       main: props.session.id ? data().session.message.list(props.session.id) : [],
       limit: model()?.limit.context,
