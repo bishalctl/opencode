@@ -21,10 +21,10 @@ bishal-patches/
   <feature>/        one sibling worktree per feature branch
 ```
 
-| Remote     | URL                    | Use                                                    |
-| ---------- | ---------------------- | ------------------------------------------------------ |
-| `origin`   | `bishalctl/opencode`   | the fork; `main/bishal` is the default branch          |
-| `upstream` | `anomalyco/opencode`   | fetches `v2` only; push URL is `DISABLED`              |
+| Remote     | URL                  | Use                                           |
+| ---------- | -------------------- | --------------------------------------------- |
+| `origin`   | `bishalctl/opencode` | the fork; `main/bishal` is the default branch |
+| `upstream` | `anomalyco/opencode` | fetches `v2` only; push URL is `DISABLED`     |
 
 `gh` is pinned to `bishalctl/opencode` (`gh repo set-default`), so `gh pr create` targets the fork, not upstream.
 
@@ -62,15 +62,15 @@ The daily upstream v2 install (`oc2`, `opencode-v2-desktop`, built by `/etc/nixo
 
 So projects, sessions, config, and auth are shared. Each side runs its own processes:
 
-|                    | upstream (`oc2`)                    | fork CLI/TUI (`ocb`)                         | fork desktop (`ocb-desktop`)                                  |
-| ------------------ | ----------------------------------- | -------------------------------------------- | ------------------------------------------------------------- |
-| channel            | `latest`                            | `bishal`                                     | `local` (forced by `packages/desktop/scripts/dev.ts`)         |
-| service file       | `state/opencode/service.json`       | `state/opencode/service-bishal.json`         | inside the desktop's userData                                 |
-| daemon port        | 49374                               | 32903                                        | 3084, bound to `0.0.0.0` (password-protected)                 |
-| database           | `opencode.db`                       | `opencode.db` (patched, see `PATCHES.md`)    | `opencode.db` (`OPENCODE_DB`)                                 |
-| TUI state          | `state/opencode/latest/tui`         | `state/opencode/bishal/tui`                  | n/a                                                           |
-| desktop identity   | `ai.opencode.desktop`               | n/a                                          | `ai.opencode.desktop.dev` (own userData + single-instance lock) |
-| updater            | on                                  | off (`OPENCODE_DISABLE_AUTOUPDATE`)          | off (dev channel)                                             |
+|                  | upstream (`oc2`)              | fork CLI/TUI (`ocb`)                      | fork desktop (`ocb-desktop`)                                    |
+| ---------------- | ----------------------------- | ----------------------------------------- | --------------------------------------------------------------- |
+| channel          | `latest`                      | `bishal`                                  | `local` (forced by `packages/desktop/scripts/dev.ts`)           |
+| service file     | `state/opencode/service.json` | `state/opencode/service-bishal.json`      | inside the desktop's userData                                   |
+| daemon port      | 49374                         | 32903                                     | 3084, bound to `0.0.0.0` (password-protected)                   |
+| database         | `opencode.db`                 | `opencode.db` (patched, see `PATCHES.md`) | `opencode.db` (`OPENCODE_DB`)                                   |
+| TUI state        | `state/opencode/latest/tui`   | `state/opencode/bishal/tui`               | n/a                                                             |
+| desktop identity | `ai.opencode.desktop`         | n/a                                       | `ai.opencode.desktop.dev` (own userData + single-instance lock) |
+| updater          | on                            | off (`OPENCODE_DISABLE_AUTOUPDATE`)       | off (dev channel)                                               |
 
 ```sh
 B=~/personal/opencode/main/bishal/bishal-patches/bin
@@ -78,7 +78,7 @@ $B/ocb                       # TUI in the current project, against the fork daem
 $B/ocb service status        # fork daemon URL; also serves the web UI
 $B/ocb service restart
 $B/ocb-web                   # Vite dev server for packages/app on :3100 → fork daemon
-$B/ocb-desktop               # Electron dev build
+$B/ocb-desktop               # Electron dev build (on NixOS: uses a Nix-built Electron of the pinned major from /nix/store)
 ```
 
 Each launcher runs the code of the worktree it lives in. `ocb` stamps its version as `0.0.0-bishal-dev.<sha>.<diff-hash>`, so when the code changes, the next `ocb` run replaces the running fork daemon. Untracked files don't change the stamp; run `ocb service restart` after adding new files. All worktrees share the one `bishal` service, so the worktree launched last owns it.
