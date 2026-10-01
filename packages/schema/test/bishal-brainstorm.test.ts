@@ -1,5 +1,7 @@
 import { expect, test } from "bun:test"
-import { contextShare } from "./usage"
+import { Brainstorm } from "@opencode/schema/bishal/brainstorm"
+
+const contextShare = Brainstorm.contextShare
 
 const assistant = (input: number, output = 0) => ({
   type: "assistant",

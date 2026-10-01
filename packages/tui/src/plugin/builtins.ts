@@ -11,11 +11,14 @@ import Storybook from "../feature-plugins/system/storybook"
 import Stats from "../feature-plugins/system/stats"
 import Latex from "@opencode/latex/plugin"
 import Merman from "@opencode/merman/plugin"
+// Fork feature (bishal-patches/PATCHES.md).
+import Brainstorm from "../feature-plugins/brainstorm"
 
 export const builtins = [
   HomeFooter,
   PromptFooter,
   PromptBtw,
+  Brainstorm,
   SidebarContext,
   SidebarMcp,
   SidebarFooter,
