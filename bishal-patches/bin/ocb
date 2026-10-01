@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Fork CLI / TUI / server, run from this worktree's source on the `bishal` channel.
+#   ocb                  TUI against the fork's background service
+#   ocb serve            foreground server
+#   ocb service status   fork daemon URL (registered in $XDG_STATE_HOME/opencode/service-bishal.json)
+set -euo pipefail
+source "$(dirname "$(readlink -f "$0")")/env.sh"
+
+# Build-time defines and the CLI's bunfig (TUI preload), passed through BUN_OPTIONS (not argv)
+# because the CLI respawns itself as `bun <entrypoint>` for the daemon, which would drop them.
+# No `--cwd`: the CLI resolves the project from the caller's working directory.
+export BUN_OPTIONS="--config=$OCB_REPO/packages/cli/bunfig.toml --define=OPENCODE_CHANNEL:\"bishal\" --define=OPENCODE_VERSION:\"$(ocb_version)\"${BUN_OPTIONS:+ $BUN_OPTIONS}"
+
+exec bun run "$OCB_REPO/packages/cli/src/index.ts" "$@"

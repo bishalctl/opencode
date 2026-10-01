@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Fork desktop (Electron, unpackaged dev build).
+#   Identity  ai.opencode.desktop.dev (own userData + single-instance lock, separate from upstream's ai.opencode.desktop)
+#   Server    isolated daemon built from this worktree; registration lives in the desktop's userData
+#   Data      shares opencode.db with upstream and `ocb`
+set -euo pipefail
+source "$(dirname "$(readlink -f "$0")")/env.sh"
+
+# packages/desktop/scripts/dev.ts forces the `local` channel, which would otherwise pick opencode-local.db.
+export OPENCODE_DB=opencode.db
+# Don't steal the opencode:// handler from the upstream desktop.
+export OPENCODE_DESKTOP_DISABLE_PROTOCOL_REGISTRATION=1
+
+exec bun run --cwd "$OCB_REPO/packages/desktop" dev "$@"

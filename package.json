@@ -39,7 +39,8 @@
       "packages/*",
       "services/*",
       "packages/console/*",
-      "packages/stats/*"
+      "packages/stats/*",
+      "bishal-patches/packages/*"
     ],
     "catalog": {
       "@effect/opentelemetry": "4.0.0-rc.112",

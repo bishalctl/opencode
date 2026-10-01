@@ -1,3 +1,18 @@
+<!-- bishal-fork:begin — keep this block self-contained so upstream merges stay conflict-free -->
+
+## Fork: bishalctl/opencode (overrides upstream rules below)
+
+This is a personal fork of `anomalyco/opencode` (`v2`). Where this block conflicts with the upstream rules below, this block wins.
+
+- The default branch is `main/bishal`, not `v2`. Branch feature work from `main/bishal` and open PRs against `main/bishal` on `bishalctl/opencode`: `gh pr create --repo bishalctl/opencode --base main/bishal`. Never open PRs or push to `anomalyco/opencode`; its push URL is `DISABLED`.
+- Use `origin/main/bishal` for diffs. `upstream/v2` is the pristine upstream; `origin/v2` mirrors it.
+- The checkout is a bare + worktree layout: `<root>/.bare/` holds the repo, and each branch is a sibling worktree at `<root>/<branch>/`, with `main/bishal` at `<root>/main/bishal/`. Add a feature worktree with `git worktree add -b <name> ../../<name> main/bishal` from inside `main/bishal/`. Branch names follow the upstream rule below (short and hyphenated, no slashes); `main/bishal` itself is the one exception.
+- Put fork-owned code, scripts, and docs in `bishal-patches/`. Keep edits to upstream files minimal, and record every one in `bishal-patches/PATCHES.md`, so upstream syncs stay cheap.
+- Pull in upstream changes periodically with `bishal-patches/scripts/sync-upstream.sh` (merge, never rebase, since `main/bishal` is shared). See `bishal-patches/README.md`.
+- Run fork builds through the `bishal-patches/bin/` launchers. They share the upstream v2 data dirs (`~/.config/opencode-v2`, `~/.local/share/opencode-v2`, …) but keep a separate server, service registration, and desktop identity, so the daily `oc2` and `opencode-v2-desktop` installs keep working.
+
+<!-- bishal-fork:end -->
+
 - After changing the public Protocol or Server `HttpApi`, run `bun run generate` from `packages/client`. Do not edit generated client files directly.
 - Keep runtime dependencies directed from Schema to Core and Protocol, then from Core and Protocol to Server. Client runtime code may depend on Schema and Protocol but never Core or Server; `sdk` composes Client, Core, and Server.
 - Current implementation changes belong in `packages/core`, `packages/cli`, `packages/server`, `packages/protocol`, `packages/schema`, and related generated client surfaces when required.

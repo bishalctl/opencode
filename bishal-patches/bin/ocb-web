@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Fork web app (Vite dev server) pointed at the fork daemon from `ocb`.
+#   OCB_WEB_PORT  Vite port (default 3100, upstream's dev default is 3000)
+# The daemon also serves the built web UI at its own URL: `ocb service status`.
+set -euo pipefail
+dir="$(dirname "$(readlink -f "$0")")"
+source "$dir/env.sh"
+
+url="$("$dir/ocb" service status)"
+port="${url##*:}"
+export VITE_OPENCODE_SERVER_HOST=127.0.0.1
+export VITE_OPENCODE_SERVER_PORT="${port%%/*}"
+echo "fork daemon: $url  (password: ocb service get password)"
+
+exec bun --cwd "$OCB_REPO/packages/app" dev --port "${OCB_WEB_PORT:-3100}" "$@"
