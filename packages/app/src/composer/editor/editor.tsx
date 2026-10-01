@@ -132,7 +132,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
           event.currentTarget.value = ""
         }}
       />
-      <Show when={!view.draftOnly && state.popover.type !== "closed"}>
+      <Show when={!view.draftOnly && props.controller.popoverOpen()}>
         <ComposerEditorPopover
           emptyLabel={i18n.t("ui.promptInput.noMatchingItems")}
           items={props.controller.suggestions()}

@@ -67,6 +67,29 @@ describe("Composer store", () => {
     expect(prompt.state.cursor).toBe(5)
   })
 
+  // Fork (bishal-patches/PATCHES.md): a command picked mid-sentence moves to the front.
+  test("moves a mid-sentence command token to the front without flattening mentions", () => {
+    const [state, setState] = createStore<ComposerPersistedState>({
+      prompt: [
+        { type: "text", content: "fix ", start: 0, end: 4 },
+        { type: "file", path: "one", content: "@one", start: 4, end: 8 },
+        { type: "text", content: " now /rev", start: 8, end: 17 },
+      ],
+      cursor: 17,
+      context: { items: [] },
+    })
+    const prompt = createComposerEditorActions([state, setState])
+
+    prompt.moveToFront("/review ", { start: 13, end: 17 })
+
+    expect(prompt.state.prompt).toEqual([
+      { type: "text", content: "/review fix ", start: 0, end: 12 },
+      { type: "file", path: "one", content: "@one", start: 12, end: 16 },
+      { type: "text", content: " now", start: 16, end: 20 },
+    ])
+    expect(prompt.state.cursor).toBe(20)
+  })
+
   test("mutates mentions, attachments, and context through editor actions", () => {
     const prompt = createPromptStore()
 

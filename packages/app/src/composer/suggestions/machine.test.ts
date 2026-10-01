@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test"
+import { Skill } from "@opencode/schema/skill"
 import type { ComposerPersistedState, ComposerSuggestion } from "../types"
 import {
   createComposerInteractionState,
@@ -10,6 +11,20 @@ import {
 
 const command: ComposerSuggestion = { id: "review", kind: "command", label: "/review" }
 const file: ComposerSuggestion = { id: "src/index.ts", kind: "file", label: "index.ts", path: "src/index.ts" }
+const skill: ComposerSuggestion = {
+  id: "slash-skill:deploy-docs",
+  kind: "skill",
+  label: "/deploy-docs",
+  inline: true,
+  mention: {
+    type: "skill",
+    id: Skill.ID.make("deploy-docs"),
+    name: Skill.Name.make("deploy-docs"),
+    content: "/deploy-docs",
+    start: 0,
+    end: 0,
+  },
+}
 
 function persisted(value = "", cursor = value.length): ComposerPersistedState {
   return {
@@ -55,10 +70,48 @@ test.each<{
     event: { type: "input.changed", value: "/re" },
     popover: { type: "command-inline", query: "re" },
   },
+  // Fork (bishal-patches/PATCHES.md): "/" also opens mid-sentence, recording where the token starts.
   {
-    name: "keeps inline commands closed when slash is not the entire prompt",
+    name: "opens inline commands mid-sentence at the slash",
     event: { type: "input.changed", value: "explain /re" },
+    popover: { type: "command-inline", query: "re", start: 8 },
+  },
+  {
+    name: "opens inline commands at the cursor when text follows",
+    event: { type: "input.changed", value: "explain /re this", persist: false },
+    draft: persisted("explain /re this", 11),
+    popover: { type: "command-inline", query: "re", start: 8 },
+  },
+  {
+    name: "keeps inline commands closed inside a word",
+    event: { type: "input.changed", value: "and/or" },
     popover: { type: "closed" },
+  },
+  {
+    name: "references a skill in place mid-sentence",
+    from: { popover: { type: "command-inline", query: "dep", start: 4 } },
+    event: { type: "popover.select", item: skill },
+    draft: persisted("use /dep now"),
+    command: { type: "mention.add", item: skill, range: { start: 4, end: 8 } },
+  },
+  {
+    name: "references a skill that opens the prompt without dropping later text",
+    from: { popover: { type: "command-inline", query: "dep" } },
+    event: { type: "popover.select", item: skill },
+    draft: persisted("/dep now"),
+    command: { type: "mention.add", item: skill, range: { start: 0, end: 4 } },
+  },
+  {
+    name: "moves a mid-sentence command to the front",
+    from: { popover: { type: "command-inline", query: "rev", start: 15 } },
+    event: { type: "popover.select", item: command },
+    draft: persisted("check the diff /rev"),
+    command: { type: "command.hoist", label: "/review", range: { start: 15, end: 19 } },
+  },
+  {
+    name: "lets keys through an empty mid-sentence picker",
+    from: { popover: { type: "command-inline", query: "etc/hosts", start: 5 } },
+    event: key("Enter", { ids: [] }),
   },
   {
     name: "opens nested slash command names",
@@ -70,7 +123,7 @@ test.each<{
     from: { popover: { type: "command-inline", query: "review/" } },
     event: { type: "popover.select", item: { ...command, label: "/review/nested" } },
     draft: persisted("/review/"),
-    command: { type: "draft.setText", value: "/review/nested " },
+    command: { type: "command.hoist", label: "/review/nested", range: { start: 0, end: 8 } },
   },
   {
     name: "opens context completion at the cursor",

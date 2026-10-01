@@ -44,5 +44,7 @@ export type ComposerSuggestion = {
   path?: string
   keybind?: string[]
   recent?: boolean
+  // Offered by a mid-sentence "/" (skills and server commands; client-only commands are start-only).
+  inline?: boolean
   mention?: ComposerFilePart | ComposerAgentPart | ComposerSkillPart
 }
